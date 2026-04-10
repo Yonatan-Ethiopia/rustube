@@ -5,4 +5,6 @@ edition = "2024"
 
 [dependencies]
 clap = "4.6.0"
+cpal = "0.17.3"
+ringbuf = "0.4.8"
 rodio = "0.22.2"
