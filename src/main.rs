@@ -9,6 +9,28 @@ use rustypipe::{client::RustyPipe, client::RustyPipeBuilder, param::StreamFilter
 use ringbuf::storage::Heap;
 use std::time::Duration;
 
+fn get_meta(url: &str)-> Result<(String, String), Box<dyn std::error::Error>> {
+    let mut yt = match Command::new("yt-dlp").args(["--print", "title", "--print", "duration_string", url]).output() {
+        Ok(output) => output,
+        Err(e) => {
+            println!("Error getting title and duration: {}", e);
+            return Err(e.into());
+        }, 
+    };
+    
+    let stdout_str = str::from_utf8(&yt.stdout).expect("Error getting string from stdout");
+    
+    let lines: Vec<&str> = stdout_str.lines().map(|s| s.trim()).collect();
+    
+    if lines.len() >= 2 {
+        let title = lines[0].to_string();
+        let duration = lines[1].to_string();
+        return Ok((title, duration))
+    } else {
+        return Err("Failed to capture both title and duration from output".into())
+    }
+}
+
 fn play_audio( stream_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut yt_cmd =  Command::new("yt-dlp").args([
         "-f", "bestaudio", "-o", "-", stream_url
@@ -26,7 +48,7 @@ fn play_audio( stream_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     ])
     .stdin(yt_cmd.stdout.unwrap())
     .stdout(Stdio::piped())
-    .stderr(Stdio::null())
+    //.stderr(Stdio::null())
     .spawn()?;
     
     let host = cpal::default_host();
@@ -75,9 +97,21 @@ fn play_audio( stream_url: &str) -> Result<(), Box<dyn std::error::Error>> {
 fn main()-> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let rp = RustyPipe::new();
+    let mut title = String::new();
+    let mut duration = String::new();
     if args.len() > 1 {
         println!("Playing......");
-        play_audio(&args[1]);
+        match get_meta(&args[1]){
+            Ok((t, d)) => {
+                title = t;
+                duration = d;
+            }
+            Err(e)=> {
+                eprintln!("Error getting meta {}", e);
+            }
+        }
+        println!("title is {}", title);
+        println!("duration is {}", duration);
     }
     else{
         print!("Please put a proper argument!");
